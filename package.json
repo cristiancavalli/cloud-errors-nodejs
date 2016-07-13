@@ -1,12 +1,14 @@
 {
   "name": "@google/cloud-errors",
   "version": "0.0.1",
-  "description": "",
+  "description": "Node.js module for Google Stackdriver Error Reporting",
   "main": "index.js",
   "scripts": {
     "test": "./node_modules/tape/bin/tape ./tests/unit/*.js",
+    "integration-tests": "./node_modules/tape/bin/tape ./tests/integration/*.js",
     "coverage": "./node_modules/istanbul/lib/cli.js cover -x \"fuzzer.js\" ./node_modules/tape/bin/tape ./tests/unit/*.js",
     "style": "./node_modules/jshint/bin/jshint lib index.js",
+    "coveralls": "istanbul cover -x \"fuzzer.js\" ./node_modules/tape/bin/tape ./tests/unit/*.js --report lcovonly -- -R spec && cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js && rm -rf ./coverage",
     "docs": "./node_modules/.bin/jsdoc -d docs index.js lib/"
   },
   "author": "Google Inc.",
@@ -18,12 +20,14 @@
   "license": "Apache 2.0",
   "devDependencies": {
     "body-parser": "^1.15.1",
+    "coveralls": "^2.11.11",
     "express": "^4.13.4",
     "hapi": "^13.4.1",
     "istanbul": "^0.4.3",
     "jsdoc": "git+https://github.com/jsdoc3/jsdoc.git",
     "jshint": "^2.9.2",
     "koa": "^1.2.0",
+    "nock": "^8.0.0",
     "restify": "^4.1.0",
     "tape": "^4.5.1"
   },

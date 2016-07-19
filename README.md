@@ -1,35 +1,27 @@
-# Node.JS module for Stackdriver Error Reporting
+# Node.js module for Stackdriver Error Reporting
 
 [![Coverage Status](https://coveralls.io/repos/github/GoogleCloudPlatform/cloud-errors-nodejs/badge.svg?branch=coveralls)](https://coveralls.io/github/GoogleCloudPlatform/cloud-errors-nodejs?branch=coveralls)
 
 > **This is not an official Google product.** This module is experimental and may not be ready for use.
 > This module uses APIs that may be undocumented and are subject to change without notice.
 
-This modules provides Stackdriver Error Reporting support for Node.JS applications.
+This modules provides Stackdriver Error Reporting support for Node.js applications.
 [Stackdriver Error Reporting](https://cloud.google.com/error-reporting/) is a feature of
 Google Cloud Platform that allows in-depth monitoring and viewing of errors reported by
 applications running in almost any environment. Here's an introductory video:
 
-[![Learn about Error Reporting in Stackdriver](https://img.youtube.com/vi/AUW4ZEhhk_w/0.jpg)](https://youtu.be/AUW4ZEhhk_w?t=24m26s)
+[![Learn about Error Reporting in Stackdriver](https://img.youtube.com/vi/cVpWVD75Hs8/0.jpg)](https://www.youtube.com/watch?v=cVpWVD75Hs8)
 
 ## Prerequisites
 
-* Your application will need to be using Node.JS version 0.12 or greater. Node.JS v5+ is recommended.
+1. Your application needs to use Node.js version 0.12 or greater.
+1. You need a [Google Cloud project](https://console.cloud.google.com). Your application can run anywhere, but errors are reported to a particular project.
+1. [Enable the Stackdriver Error Reporting API](https://console.cloud.google.com/apis/api/clouderrorreporting.googleapis.com/overview) for your project.
+1. The module will only send errors when the `NODE_ENV` environment variable is set to `production`.
 
-## Quickstart (Node.JS v4.x+)
+## Quickstart on Google Cloud Platform
 
-1. **Enable the Error Reporting API for your project:**
-
-  [Enable the Error Reporting API here](https://console.cloud.google.com/apis/api/clouderrorreporting.googleapis.com/overview)
-
-2. **Create an API key:**
-
-  (This authentication step is not needed if you run on Google Cloud Platform)
-
-  Follow [these instructions](https://support.google.com/cloud/answer/6158857) to get an API key for your project.
-
-
-3. **Install the module:**
+1. **Install the module:**
 
   In your project, on the command line:
 
@@ -37,74 +29,51 @@ applications running in almost any environment. Here's an introductory video:
 	# Install through npm while saving to the local 'package.json'
 	npm install --save @google/cloud-errors
 	```
+1. **Instrument your application:**
 
-4. **Instrument your application:**
+	```JS
+	// Require the library and initialize the error handler
+	var errorHandler = require('@google/cloud-errors')({
+		serviceContext: {service: 'my-service'}	// not needed on Google App Engine
+	});
+	
+	// Report an error to the Stackdriver Error Reporting API
+	errorHandler.report('Somethign broke!');
+	```
 
-```JS
-// Require the library and initialize the error handler
-var errorHandler = require('@google/cloud-errors')({
-	projectId: 'my-project-id',	// not needed on Google Cloud Platform
-	key: 'my-api-key',		// not needed on Google Cloud Platform
-	serviceContext: {		// not needed on Google App Engine
-		service: 'my-service',
-		version: 'alpha1'
-	}
-});
-
-// Report an error to the StackDriver API
-errorHandler.report(new Error('This is a test'));
-```
-
-5. **View reported errors:**
+1. **View reported errors:**
 
   Open Stackdriver Error Reporting at https://console.cloud.google.com/errors to view the reported errors. 
 
 ## Setup
 
-When initing the Stackdriver Error reporting library you can specify several options
+When initing the Stackdriver Error Reporting library you must specify the following:
+
+* **Authentication**: either using a path to your keyfile in the `GOOGLE_APPLICATION_CREDENTIALS` environment variable, or using a path to your keyfile in the `keyFilename` argument or using an [API key](https://support.google.com/cloud/answer/6158862) string in the `key` argument.
+* **projectId**: either using the `GLCOUD_PROJECT` environment variable or the `projectId` argument.
+* **service**: either using the `GAE_MODULE_NAME`  environment variable or the `serviceContext.service` argument.
+
+On Google App Engine, these environment variables are already set.
 
 ```JS
 var errorHandler = require('@google/cloud-errors')({
 	projectId: 'my-project-id',
-	key: 'my-optional-api-key',
-	onUncaughtException: 'report',
+	key: 'my-api-key',
+	keyFilename: 'path-to-my-keyfile'
+	onUncaughtException: 'report', // or 'ignore' or 'reportAndExit'
 	serviceContext: {
 		service: 'my-service',
-		version: 'alpha1'
+		version: 'my-service-version'
 	}
 });
 ```
-
-Configure the error handling library to handle uncaught exceptions in serveral different ways:
-
-```JS
-{  // Ignore all uncaught errors, this is the default behavior
-	onUncaughtException: 'ignore'
-}
-
-{ // Report all uncaught errors and do not forcefully exit
-	onUncaughtException: 'report'
-}
-
-{ // Report any uncaught error and then attempt to exit after
-	onUncaughtException: 'reportAndExit'
-}
-```
-
-> All initialization arguments are optional but please be aware that to report errors to the service
-> one must specify a projectId either through the `GLCOUD_PROJECT` environment variable or through the
-> Javascript interface while developing locally. One must also specify a key through
-> the Javascript interface or through the `GOOGLE_APPLICATION_CREDENTIALS` environment variable which
-> should contain a path to the keyfile while developing locally.
 
 ### Using Express
 
 ```JS
 var express = require('express');
 var app = express();
-var errorHandler = require('@google/cloud-errors')({
-  projectId: "my-project-id"
-});
+var errorHandler = require('@google/cloud-errors')();
 
 app.get(
   '/errorRoute',
@@ -139,9 +108,7 @@ app.listen(
 
 ```JS
 var hapi = require('hapi');
-var errorHandler = require('@google/cloud-errors')({
-  projectId: 'my-project-id'
-});
+var errorHandler = require('@google/cloud-errors')();
 
 var server = new hapi.Server();
 server.connection({ port: 3000 });
@@ -187,9 +154,7 @@ server.register(
 ### Using Koa
 
 ```JS
-	var errorHandler = require('@google/cloud-errors')({
-		projectId: 'my-project-id'
-	});
+	var errorHandler = require('@google/cloud-errors')();
 	var koa = require('koa');
 	var app = koa();
 
@@ -216,9 +181,7 @@ server.register(
 	}
 
 	var restify = require('restify');
-	var errorHandler = require('@google/cloud-errors')({
-		projectId: 'my-project-id'
-	});
+	var errorHandler = require('@google/cloud-errors')();
 
 	var server = restify.createServer();
 
@@ -230,29 +193,6 @@ server.register(
 	  console.log('%s listening at %s', server.name, server.url);
 	});
 ```
-
-## Developing Locally
-
-1. Specify you project-id and key either through environment variables or through the application interface:
-
-	* Via environment variables:
-
-		```bash
-			> export GLCOUD_PROJECT=<YOUR_PROJECT_ID>
-
-			> export GOOGLE_APPLICATION_CREDENTIALS=<path/to/your/keyfile.json>
-
-			> node myApp.js
-		```
-
-	* Via the javascript interface:
-
-		```JS
-		var errorHandler = require('@google/cloud-errors')({
-			projectId: 'your-project-id',
-			key: 'your-api-key'
-		});
-		```
 
 ## Developing the library
 

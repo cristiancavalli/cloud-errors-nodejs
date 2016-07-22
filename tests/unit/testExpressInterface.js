@@ -20,6 +20,7 @@ var merge = lodash.merge;
 var expressInterface = require('../../lib/interfaces/express.js');
 var ErrorMessage = require('../../lib/classes/error-message.js');
 var Fuzzer = require('../../utils/fuzzer.js');
+var Configuration = require('../../lib/configuration.js');
 
 test(
   "Given invalid, variable input the express interface handler setup should not throw errors"
@@ -92,12 +93,12 @@ test(
     var stubbedClient = {
       sendError: sendError
     };
-    var stubbedConfig = {
+    var stubbedConfig = new Configuration({
       serviceContext: {
         service: "a_test_service"
         , version: "a_version"
       }
-    };
+    }).init().addErrorListener(function (){});
     var testError = new Error("This is a test");
 
     var validBoundHandler = expressInterface(stubbedClient, stubbedConfig);
@@ -108,8 +109,8 @@ test(
       res
       , merge(new ErrorMessage().setMessage(testError.stack)
         .setServiceContext(
-          stubbedConfig.serviceContext.service
-          , stubbedConfig.serviceContext.version
+          stubbedConfig._serviceContext.service
+          , stubbedConfig._serviceContext.version
         ), { eventTime: res.eventTime } )
       , [
           "The error message should be default values except for the supplied"

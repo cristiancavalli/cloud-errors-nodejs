@@ -15,9 +15,8 @@
  */
 
 var test = require('tape');
-var lodash = require('lodash');
-var omit = lodash.omit;
-var merge = lodash.merge;
+var omit = require('lodash.omit');
+var merge = require('lodash.merge');
 var manualRequestInformationExtractor = require('../../lib/request-extractors/manual.js');
 var Fuzzer = require('../../utils/fuzzer.js');
 

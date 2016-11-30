@@ -21,10 +21,9 @@ var RequestHandler = require('../../lib/google-apis/auth-client.js');
 var ErrorMessage = require('../../lib/classes/error-message.js');
 var Configuration = require('../fixtures/configuration.js');
 var createLogger = require('../../lib/logger.js');
-var lodash = require('lodash');
-var isObject = lodash.isObject;
-var isString = lodash.isString;
-var isEmpty = lodash.isEmpty;
+var isObject = require('lodash.isobject');
+var isString = require('lodash.isstring');
+var isEmpty = require('lodash.isempty');
 var client;
 
 

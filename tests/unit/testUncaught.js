@@ -15,8 +15,7 @@
  */
 
 var test = require('tape');
-var lodash = require('lodash');
-var isString = lodash.isString;
+var isString = require('lodash.isstring');
 var uncaughtSetup = require('../../lib/interfaces/uncaught.js');
 var Configuration = require('../fixtures/configuration.js');
 var originalHandlers = process.listeners('uncaughtException');

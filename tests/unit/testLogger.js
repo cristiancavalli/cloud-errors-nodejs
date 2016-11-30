@@ -16,7 +16,6 @@
 
 'use strict';
 var test = require('tape');
-var lodash = require('lodash');
 var createLogger = require('../../lib/logger.js');
 
 test('Initializing the logger', function (t) {

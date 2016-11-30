@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-var lodash = require('lodash');
-var isFunction = lodash.isFunction;
-var isPlainObject = lodash.isPlainObject;
-var has = lodash.has;
+var isFunction = require('lodash.isfunction');
+var isPlainObject = require('lodash.isplainobject');
+var has = require('lodash.has');
 var test = require('tape');
 var hapiInterface = require('../../lib/interfaces/hapi.js');
 var ErrorMessage = require('../../lib/classes/error-message.js');

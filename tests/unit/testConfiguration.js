@@ -16,8 +16,7 @@
 
 'use strict';
 var test = require('tape');
-var lodash = require('lodash');
-var isNumber = lodash.isNumber;
+var isNumber = require('lodash.isnumber');
 var Configuration = require('../fixtures/configuration.js');
 var version = require('../../package.json').version;
 var Fuzzer = require('../../utils/fuzzer.js');

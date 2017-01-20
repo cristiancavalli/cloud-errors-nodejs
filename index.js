@@ -28,6 +28,7 @@ var AuthClient = require('./src/google-apis/auth-client.js');
 // Begin error reporting interfaces
 
 var koa = useKoa ? require('./src/interfaces/koa.js') : null;
+var koaNext = useKoa ? require('./src/interfaces/koaNext.js') : null;
 var hapi = require('./src/interfaces/hapi.js');
 var manual = require('./src/interfaces/manual.js');
 var express = require('./src/interfaces/express.js');
@@ -99,6 +100,7 @@ function Errors(initConfiguration) {
 
   if (koa) {
     this.koa = koa(client, config);
+    this.koaNext = koaNext(client, config);
   }
 }
 

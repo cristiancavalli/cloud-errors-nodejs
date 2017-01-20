@@ -193,6 +193,21 @@ app.use(function *(){
 app.listen(3000);
 ```
 
+### Using koa@next
+
+```JS
+const errors = require('@google/cloud-errors')();
+const Koa = require('koa');
+const app = new Koa();
+
+// Will attach to 'error' event which includes
+// request/response lifecycle errors
+errors.koaNext(app);
+
+app.use(ctx => ctx.body = 'Hello World!');
+app.listen(3000);
+```
+
 ### Using Restify
 
 ```JS

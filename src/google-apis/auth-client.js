@@ -16,16 +16,27 @@
 
 'use strict';
 var commonDiag = require('@google/cloud-diagnostics-common');
+var querystring = require('querystring');
 var logger = require('../logger.js');
+var errors = require('./errors.js');
+var noOp = require('lodash.noop');
 var is = require('is');
 var isFunction = is.fn;
 var isString = is.string;
+var isEmpty = require('lodash.isempty');
+var extend = require('extend');
 
 /* @const {Array<String>} list of scopes needed to work with the errors api. */
 var SCOPES = ['https://www.googleapis.com/auth/cloud-platform'];
 
 /* @const {String} Base Error Reporting API */
 var API = 'https://clouderrorreporting.googleapis.com/v1beta1/projects';
+
+var API_ENDPOINTS = {
+  report: 'events:report',
+  deleteAllEvents: 'events',
+  listEvents: 'events'
+}
 
 /**
  * The RequestHandler constructor initializes several properties on the
@@ -62,20 +73,48 @@ function RequestHandler(config, logger) {
 }
 
 /**
- * Compute the URL that errors should be reported to given the projectId and
- * optional key.
+ * Manufacture a valid Errors service href given a valid projectId and endpoint
+ * are given as parameters. Query is an optional object argument which, if given
+ * will be converted to a query-string and appended to the returned href.
  * @param {String} projectId - the project id of the application.
- * @param {String|Null} [key] - the API key used to authenticate against the
- *  service in place of application default credentials.
- * @returns {String} computed URL that the errors should be reported to.
+ * @param {API_ENDPOINTS} endpoint - one of the API_ENDPOINTS constituent
+ *  strings.
+ * @param {Object} [query] - an optional single-topology object which will be
+ *  converted to a query string and appended to the returned url if given.
+ * @returns {String} A Errors Service HREF
  * @private
  */
-function getErrorReportURL(projectId, key) {
-  var url = [API, projectId, 'events:report'].join('/');
-  if (isString(key)) {
-    url += '?key=' + key;
+function manufactureAPIHref (projectId, endpoint, query) {
+  return ([API, projectId, endpoint].join('/')) +
+    (isEmpty(query) ? '' : '?' + querystring.stringify(query));
+  // + 
+  //   isEmpty(query) ? '' : '?' + querystring.stringify(query);
+}
+
+RequestHandler.prototype.requestPreflight = function (userCb, readyCb) {
+  var self = this;
+  var validatedCb = isFunction(userCb) ? userCb : noOp;
+  var e;
+  if (!self._config.getShouldReportErrorsToAPI()) {
+    e = new errors.ClientNotConfiguredToSendErrors();
+    self._logger.error(e.message);
+    return readyCb(validatedCb, e, null);
   }
-  return url;
+  self._config.getProjectId(function (err, id) {
+    if (err) {
+      e = new errors.UnableToRetrieveProjectId(err.message);
+      self._logger.error(e.message);
+      return readyCb(validatedCb, e, null);
+    }
+    return readyCb(validatedCb, null, id);
+  });
+};
+
+RequestHandler.prototype.getAPIKeyOptions = function () {
+  if (this._config.getKey()) {
+    return {key: this._config.getKey()};
+  }
+  return {};
 }
 
 /**
@@ -91,45 +130,69 @@ function getErrorReportURL(projectId, key) {
  */
 RequestHandler.prototype.sendError = function(errorMessage, userCb) {
   var self = this;
-  var cb = isFunction(userCb) ? userCb : function() {};
-  if (self._config.getShouldReportErrorsToAPI()) {
-    self._config.getProjectId(function (err, id) {
+  this.requestPreflight(userCb, function (cb, err, id) {
+    if (err) {
+      return cb(err, null, null);
+    }
+    var opts = self.getAPIKeyOptions();
+    self._request({
+      uri: manufactureAPIHref(id, API_ENDPOINTS.report, opts),
+      method: 'POST',
+      json: errorMessage
+    }, function (err, response, body) {
       if (err) {
-        setImmediate(function () { cb(err, null, null); });
-        self._logger.error([
-          'Unable to retrieve a project id from the Google Metadata Service or',
-          'the local environment. Client will not be able to communicate with',
-          'the Stackdriver Error Reporting API without a valid project id', 
-          'Please make sure to supply a project id either through the',
-          'GCLOUD_PROJECT environmental variable or through the configuration',
-          'object given to this library on startup if not running on Google',
-          'Cloud Platform.'
-        ].join(' '));
-        return;
+        self._logger.error(
+          new errors
+            .BadAPIInteraction('write an error to the API', err.message));
       }
-      self._request({
-        url: getErrorReportURL(id, self._config.getKey()),
-        method: 'POST',
-        json: errorMessage
-      }, function (err, response, body) {
-        if (err) {
-          self._logger.error([
-            'Encountered an error while attempting to transmit an error to the',
-            'Stackdriver Error Reporting API.'
-          ].join(' '), err);
-        }
-        cb(err, response, body);
-      });
+      cb(err, response, body);
     });
-  } else {
-    cb(new Error([
-      'Stackdriver error reporting client has not been configured to send',
-      'errors, please check the NODE_ENV environment variable and make sure it',
-      'is set to "production" or set the ignoreEnvironmentCheck property to ',
-      'true in the runtime configuration object'
-    ].join(' ')), null, null);
-  }
+  });
 };
+
+RequestHandler.prototype.deleteAllErrors = function (userCb) {
+  var self = this;
+  this.requestPreflight(userCb, function (cb, err, id) {
+    if (err) {
+      return cb(err, null, null);
+    }
+    var opts = self.getAPIKeyOptions();
+    self._request({
+      uri: manufactureAPIHref(id, API_ENDPOINTS.deleteAllEvents, opts),
+      method: 'DELETE'
+    }, function (err, response, body) {
+      if (err) {
+        self._logger.error(
+          new errors.BadAPIInteraction('delete all errors from project: '+id,
+              err.message));
+      }
+      cb(err, response, body);
+    });
+  });
+};
+
+RequestHandler.prototype.listErrors = function (listErrorOptions, userCb) {
+  var self = this;
+  this.requestPreflight(userCb, function (cb, err, id) {
+    var opts = extend(self.getAPIKeyOptions(), listErrorOptions
+      .exportAsRequestOptions());
+    // console.log('---');
+    // console.log('HERE IS THE LIST URL:')
+    // console.log('  '+manufactureAPIHref(id, API_ENDPOINTS.listEvents, opts));
+    // console.log('---');
+    self._request({
+      uri: manufactureAPIHref(id, API_ENDPOINTS.listEvents, opts),
+      method: 'GET'
+    }, function (err, response, body) {
+      if (err) {
+        self._logger.error(
+          new errors.BadAPIInteraction('list errors from project '+id,
+            err.message));
+      }
+      cb(err, response, body);
+    });
+  });
+}
 /**
  * The requestCallback callback function is called on completion of an API
  * request whether that completion is success or failure. The request can either

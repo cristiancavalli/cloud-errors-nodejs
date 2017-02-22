@@ -5,8 +5,8 @@
   "main": "index.js",
   "repository": "GoogleCloudPlatform/cloud-errors-nodejs",
   "scripts": {
-    "test": "$(npm bin)/nyc --exclude=\"fuzzer.js\" ./node_modules/mocha/bin/mocha ./tests/unit/*.js",
-    "integration-tests": "$(npm bin)/nyc -exclude=[\"error-message.js\"] ./node_modules/mocha/bin/mocha ./tests/integration/*.js",
+    "test": "$(npm bin)/nyc --reporter=html --exclude=\"fuzzer.js\" $(npm bin)/mocha ./tests/unit/*.js",
+    "integration-tests": "$(npm bin)/nyc --exclude=[\"error-message.js\"] $(npm bin)/mocha ./tests/integration/*.js",
     "style": "./node_modules/jshint/bin/jshint lib index.js",
     "coverage": "./bin/test.sh -l",
     "coveralls": "./bin/test.sh",
@@ -42,7 +42,14 @@
     "@google/cloud-diagnostics-common": "0.3.0",
     "extend": "^3.0.0",
     "is": "^3.2.0",
-    "lodash.has": "^4.5.2"
+    "lodash.every": "^4.6.0",
+    "lodash.has": "^4.5.2",
+    "lodash.isempty": "^4.4.0",
+    "lodash.noop": "^3.0.1",
+    "lodash.omit": "^4.5.0",
+    "lodash.pick": "^4.4.0",
+    "lodash.pickby": "^4.6.0",
+    "lodash.transform": "^4.6.0"
   },
   "nyc": {
     "exclude": [

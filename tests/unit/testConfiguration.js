@@ -263,8 +263,8 @@ describe('Configuration class', function () {
     after(function () {
       /*
        * !! IMPORTANT !!
-       * THE restoreEnv FUNCTION SHOULD BE CALLED LAST AS THIS TEST FILE EXITS
-       * AND SHOULD THEREFORE BE THE LAST THING TO EXECUTE FROM THIS FILE.
+       * THE restoreEnv FUNCTION SHOULD BE THE LAST THING TO EXECUTE IN THIS
+       * FILE.
        * !! IMPORTANT !!
        */
       restoreEnv();

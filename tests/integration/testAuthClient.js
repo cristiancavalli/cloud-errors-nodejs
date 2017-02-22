@@ -19,6 +19,7 @@ var assert = require('assert');
 var nock = require('nock');
 var RequestHandler = require('../../src/google-apis/auth-client.js');
 var ErrorMessage = require('../../src/classes/error-message.js');
+var ListErrorOptions = require('../../src/classes/list-error-options.js');
 var Configuration = require('../fixtures/configuration.js');
 var createLogger = require('../../src/logger.js');
 var is = require('is');
@@ -33,15 +34,15 @@ var client;
 describe('Behvaiour acceptance testing', function () {
   before(function () {
     // Before starting the suite make sure we have the proper resources
-    if (!isString(process.env.GCLOUD_PROJECT)) {
+    if (isEmpty(process.env.GCLOUD_PROJECT)) {
       console.error(
         'The gcloud project id (GCLOUD_PROJECT) was not set as an env variable');
       this.skip();
-    } else if (!isString(process.env.STUBBED_API_KEY)) {
+    } else if (isEmpty(process.env.STUBBED_API_KEY)) {
       console.error(
         'The api key (STUBBED_API_KEY) was not set as an env variable');
       this.skip();
-    } else if (!isString(process.env.STUBBED_PROJECT_NUM)) {
+    } else if (isEmpty(process.env.STUBBED_PROJECT_NUM)) {
       console.error(
         'The project number (STUBBED_PROJECT_NUM) was not set as an env variable');
       this.skip();
@@ -54,7 +55,117 @@ describe('Behvaiour acceptance testing', function () {
     // In case we are running after unit mocks which were not destroyed properly
     nock.cleanAll();
   });
-  describe('Request/Response lifecycle mocking', function () {
+  describe('Error Listing Request/Response lifecycle mocking', function () {
+    const GROUP_ID = 'xyz';
+    const PAGE_SIZE = 10;
+    var scope, client, logger, listOptions;
+    beforeEach(function () {
+      scope = nock(
+        'https://clouderrorreporting.googleapis.com/v1beta1/projects/'+
+        process.env.GCLOUD_PROJECT
+      ).persist().get('/events');
+      logger = createLogger({logLevel: 5});
+      client = new RequestHandler(
+        new Configuration({ignoreEnvironmentCheck: true}, logger), logger);
+      listOptions = (new ListErrorOptions()).setGroupId(GROUP_ID);
+    });
+    afterEach(function () {
+      nock.cleanAll();
+    });
+    describe('Receiving non-retryable errors', function () {
+      before(function () {nock.cleanAll();});
+      it('Should fail', function (done) {
+        this.timeout(5000);
+        client.listErrors({exportAsRequestOptions: function () {
+          return {};
+        }}, function (err, response, body) {
+          console.log('HERE IS THE ERROR', err, body);
+          assert(err instanceof Error);
+          assert.strictEqual(err.message.toLowerCase().trim(),
+            'missing group_id.');
+          assert.strictEqual(response.statusCode, 400);
+          done();
+        });
+      });
+    });
+    describe('Receiving retryable errors', function () {
+      it('Should retry', function (done) {
+        this.timeout(25000);
+        var tries = 0;
+        var intendedTries = 5;
+        scope.query({
+          groupId: GROUP_ID,
+          pageSize: PAGE_SIZE
+        }).reply(429, function () {
+          tries += 1;
+          console.log('Mock Server Received Request:', tries+'/'+intendedTries);
+          return {error: 'Please try again later'};
+        });
+        client.listErrors(listOptions, function (err, response, body) {
+          assert.strictEqual(tries, intendedTries);
+          done();
+        });
+      });
+    });
+    describe('Using an API key', function () {
+      it('Should provide the key as a query string on outgoing requests', function (done) {
+        var key = process.env.STUBBED_API_KEY;
+        var client = new RequestHandler(new Configuration(
+          {key: key, ignoreEnvironmentCheck: true},
+          createLogger({logLevel: 5})));
+        scope.query({
+          key: key,
+          groupId: GROUP_ID,
+          pageSize: PAGE_SIZE
+        }).reply(200, function (uri) {
+          assert(uri.indexOf('key='+key) > -1);
+          return {};
+        });
+        client.listErrors(listOptions, function (err) {
+          assert.strictEqual(err, null);
+          done();
+        });
+      });
+    });
+    describe('Callback-less invocation', function () {
+      it('Should still execute the request', function (done) {
+        scope.query({
+          groupId: GROUP_ID,
+          pageSize: PAGE_SIZE
+        }).reply(200, function () {
+          done();
+        });
+        client.listErrors(listOptions);
+      });
+    });
+    describe('Valid request with all options set (sans \'fields\' field)', function () {
+      it('Should correctly format the query string', function (done) {
+        const service = 'abc';
+        const version = '1.2.3';
+        const resourceType = 'node';
+        const timeRange = ListErrorOptions.timePeriods().PERIOD_ONE_HOUR;
+        const pageToken = '1337';
+        scope.query({
+          groupId: GROUP_ID,
+          pageSize: PAGE_SIZE,
+          pageToken: pageToken,
+          'serviceFilter.service': service,
+          'serviceFilter.version': version,
+          'serviceFilter.resourceType': resourceType,
+          'timeRange.period': timeRange
+        }).reply(200, function () {
+          done();
+        });
+        client.listErrors(
+          listOptions
+            .setServiceFilter(service, version, resourceType)
+            .setTimeRange(timeRange)
+            .setPageToken(pageToken)
+        );
+      });
+    });
+  });
+  describe('Error Reporting Request/Response lifecycle mocking', function () {
     var sampleError = new Error("_@google_STACKDRIVER_INTEGRATION_TEST_ERROR__");
     var errorMessage = new ErrorMessage().setMessage(sampleError);
     var fakeService, client, logger;
@@ -267,12 +378,6 @@ describe('Behvaiour acceptance testing', function () {
         });
       });
       describe('An invalid env configuration', function () {
-        var ERROR_STRING = [
-          'Unable to find the project Id for communication with the Stackdriver',
-          'Error Reporting service. This app will be unable to send errors to',
-          'the reporting service unless a valid project Id is supplied via',
-          'runtime configuration or the GCLOUD_PROJECT environmental variable.'
-        ].join(' ');
         var logger, client;
         before(function () {
           delete process.env.GCLOUD_PROJECT;
@@ -286,7 +391,6 @@ describe('Behvaiour acceptance testing', function () {
         it('Should callback with an error', function (done) {
           client.sendError(errorMessage, function (err, response, body) {
             assert(err instanceof Error);
-            assert.strictEqual(err.message, ERROR_STRING);
             assert.strictEqual(response, null);
             assert.strictEqual(body, null);
             done();

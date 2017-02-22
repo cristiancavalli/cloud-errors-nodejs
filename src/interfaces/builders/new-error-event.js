@@ -15,7 +15,7 @@
  */
 
 'use strict';
-var ErrorMessage = require('../classes/error-message.js');
+var ErrorMessage = require('../../classes/error-message.js');
 
 /**
  * The handler setup function serves to produce a bound instance of the

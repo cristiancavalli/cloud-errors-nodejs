@@ -18,8 +18,6 @@
 var assert = require('assert');
 var path = require('path');
 var nock = require('nock');
-var http = require('http');
-var express = require('express');
 var Errors = require('../..');
 
 var originalHandlers = process.listeners('uncaughtException');
@@ -90,38 +88,19 @@ describe('Testing use of runtime configurations', function () {
           reportUncaughtExceptions: false
         };
         var agent = new Errors(config);
-        var app = express();
-        app.use('/', function () {
-          throw '0';
-        });
-        app.use(agent.express);
-        var server = app.listen(3000, function() {
-          nock.enableNetConnect('localhost');
-          var scope = nock('https://accounts.google.com/o/oauth2')
-            .intercept('/token', 'POST', function(body) {
-              assert.strictEqual(body.client_id, config.credentials.client_id);
-              assert.strictEqual(body.client_secret, config.credentials.client_secret);
-              assert.strictEqual(body.refresh_token, config.credentials.refresh_token);
-              return true;
-            }).reply(200, {
-              refresh_token: 'hello',
-              access_token: 'goodbye',
-              expiry_date: new Date(9999, 1, 1)
-            });
-
-          // Since we have to get an auth token, this always gets intercepted second
-          nock('https://clouderrorreporting.googleapis.com/v1beta1/projects/0')
-            .post('/events:report', function() {
-              assert(scope.isDone());
-              nock.cleanAll();
-              server.close();
-              reattachOriginalListeners();
-              done();
-              return true;
-            }).reply(200);
-
-          http.get({port: 3000, path: '/'}, function(res) {});
-        });
+        nock.disableNetConnect();
+        var scope = nock('https://accounts.google.com/o/oauth2')
+          .intercept('/token', 'POST', function(body) {
+            assert.strictEqual(body.client_id, config.credentials.client_id);
+            assert.strictEqual(body.client_secret, config.credentials.client_secret);
+            assert.strictEqual(body.refresh_token, config.credentials.refresh_token);
+            done();
+          }).reply(200, {
+            refresh_token: 'hello',
+            access_token: 'goodbye',
+            expiry_date: new Date(9999, 1, 1)
+          });
+        agent.report(new Error('0'));
       });
     }
   );
@@ -136,7 +115,8 @@ describe('Testing use of runtime configurations', function () {
         refresh_token: 'c',
         type: 'authorized_user'
       },
-      reportUncaughtExceptions: true
+      reportUncaughtExceptions: true,
+      ignoreEnvironmentCheck: true
     };
     ['client_id', 'client_secret', 'refresh_token'].forEach(function (field) {
       assert(correctCredentials.hasOwnProperty(field));
@@ -145,38 +125,18 @@ describe('Testing use of runtime configurations', function () {
         correctCredentials[field]);
     });
     var agent = new Errors(config);
-    var app = express();
-    app.use('/', function () {
-      throw '0';
-    });
-    app.use(agent.express);
-    var server = app.listen(3000, function() {
-      nock.disableNetConnect();
-      nock.enableNetConnect('localhost');
-      var scope = nock('https://accounts.google.com/o/oauth2')
-        .intercept('/token', 'POST', function(body) {
-          assert.strictEqual(body.client_id, correctCredentials.client_id);
-          assert.strictEqual(body.client_secret, correctCredentials.client_secret);
-          assert.strictEqual(body.refresh_token, correctCredentials.refresh_token);
-          return true;
-        }).reply(200, {
-          refresh_token: 'hello',
-          access_token: 'goodbye',
-          expiry_date: new Date(9999, 1, 1)
-        });
-
-      // Since we have to get an auth token, this always gets intercepted second
-      nock('https://clouderrorreporting.googleapis.com/v1beta1/projects/0')
-        .post('/events:report', function() {
-          assert(scope.isDone());
-          nock.cleanAll();
-          server.close();
-          reattachOriginalListeners();
-          done();
-          return true;
-        }).reply(200);
-
-      http.get({port: 3000, path: '/'}, function(res) {});
-    });
+    nock.disableNetConnect();
+    var scope = nock('https://accounts.google.com/o/oauth2')
+      .intercept('/token', 'POST', function(body) {
+        assert.strictEqual(body.client_id, correctCredentials.client_id);
+        assert.strictEqual(body.client_secret, correctCredentials.client_secret);
+        assert.strictEqual(body.refresh_token, correctCredentials.refresh_token);
+        done();
+      }).reply(200, {
+        refresh_token: 'hello',
+        access_token: 'goodbye',
+        expiry_date: new Date(9999, 1, 1)
+      });
+    agent.report(new Error('0'));
   });
 });

@@ -30,11 +30,17 @@ var AuthClient = require('./src/google-apis/auth-client.js');
 var koa = useKoa ? require('./src/interfaces/koa.js') : null;
 var hapi = require('./src/interfaces/hapi.js');
 var manual = require('./src/interfaces/manual.js');
+var listErrors = require('./src/interfaces/listErrors.js');
 var express = require('./src/interfaces/express.js');
 var restify = require('./src/interfaces/restify');
-var messageBuilder = require('./src/interfaces/message-builder.js');
+// OLD NEW ERROR BUILDER:
+// var messageBuilder = require('./src/interfaces/message-builder.js');
 var uncaughtException = require('./src/interfaces/uncaught.js');
 var createLogger = require('./src/logger.js');
+
+// Model builder factories
+var getErrorBuilder = require('./src/interfaces/builders/get-error-event.js');
+var newErrorBuilder = require('./src/interfaces/builders/new-error-event.js');
 
 /**
  * @typedef ConfigurationOptions
@@ -93,12 +99,16 @@ function Errors(initConfiguration) {
   // Setup the uncaught exception handler
   uncaughtException(client, config);
 
-  // Build the application interfaces for use by the hosting application
+  // Application Interfaces
   this.hapi = hapi(client, config);
-  this.report = manual(client, config);
   this.express = express(client, config);
   this.restify = restify(client, config);
-  this.event = messageBuilder(config);
+  // Manual Interfaces
+  this.report = manual(client, config);
+  this.getErrors = listErrors(client, config);
+  // Builder Interfaces
+  this.event = newErrorBuilder(config);
+  this.eventQuery = getErrorBuilder(config);
 
   if (koa) {
     this.koa = koa(client, config);

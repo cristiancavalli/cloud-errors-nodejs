@@ -51,6 +51,8 @@ function handlerSetup(client, config) {
    */
   function uncaughtExceptionHandler(err) {
     var em = new ErrorMessage();
+    em.setServiceContext(config.getServiceContext().service,
+                        config.getServiceContext().version);
     errorHandlerRouter(err, em);
     client.sendError(em, handleProcessExit);
     setTimeout(handleProcessExit, 2000);
